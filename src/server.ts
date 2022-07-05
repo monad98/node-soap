@@ -115,7 +115,7 @@ export class Server extends EventEmitter {
             const authorizeResult = this.authorizeConnection(req, res);
             if (typeof authorizeResult === 'boolean') {
               if (!authorizeResult) {
-                res.end();
+                res.sendStatus(401);
                 return;
               }
             } else if (isPromiseLike<boolean>(authorizeResult)) {
@@ -123,11 +123,11 @@ export class Server extends EventEmitter {
               try {
                 result = await authorizeResult;
               } catch (err) {
-                res.end();
+                res.sendStatus(401);
                 return;
               }
               if (!result) {
-                res.end();
+                res.sendStatus(401);
                 return;
               }
             }
@@ -143,6 +143,7 @@ export class Server extends EventEmitter {
             const authorizeResult = this.authorizeConnection(req, res);
             if (typeof authorizeResult === 'boolean') {
               if (!authorizeResult) {
+                res.writeHead(401);
                 res.end();
                 return;
               }
@@ -151,10 +152,12 @@ export class Server extends EventEmitter {
               try {
                 result = await authorizeResult;
               } catch (err) {
+                res.writeHead(401);
                 res.end();
                 return;
               }
               if (!result) {
+                res.writeHead(401);
                 res.end();
                 return;
               }
