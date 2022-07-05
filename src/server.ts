@@ -75,7 +75,7 @@ export class Server extends EventEmitter {
   public path: string | RegExp;
   public services: IServices;
   public log: (type: string, data: any) => any;
-  public authorizeConnection: (req: Request, res?: Response) => boolean;
+  public authorizeConnection: (req: Request, res?: Response) => boolean | Promise<boolean>;
   public authenticate: (security: any, processAuthResult?: (result: boolean) => void, req?: Request, obj?: any) => boolean | void | Promise<boolean>;
 
   private wsdl: WSDL;
@@ -110,11 +110,26 @@ export class Server extends EventEmitter {
     wsdl.onReady((err) => {
       if (isExpress(server)) {
         // handle only the required URL path for express server
-        server.route(path).all((req, res) => {
+        server.route(path).all(async (req, res) => {
           if (typeof this.authorizeConnection === 'function') {
-            if (!this.authorizeConnection(req, res)) {
-              res.end();
-              return;
+            const authorizeResult = this.authorizeConnection(req, res);
+            if (typeof authorizeResult === 'boolean') {
+              if (!authorizeResult) {
+                res.end();
+                return;
+              }
+            } else if (isPromiseLike<boolean>(authorizeResult)) {
+              let result = false;
+              try {
+                result = await authorizeResult;
+              } catch (err) {
+                res.end();
+                return;
+              }
+              if (!result) {
+                res.end();
+                return;
+              }
             }
           }
           this._requestListener(req, res);
@@ -123,11 +138,26 @@ export class Server extends EventEmitter {
       } else {
         const listeners = server.listeners('request').slice();
         server.removeAllListeners('request');
-        server.addListener('request', (req, res) => {
+        server.addListener('request', async (req, res) => {
           if (typeof this.authorizeConnection === 'function') {
-            if (!this.authorizeConnection(req, res)) {
-              res.end();
-              return;
+            const authorizeResult = this.authorizeConnection(req, res);
+            if (typeof authorizeResult === 'boolean') {
+              if (!authorizeResult) {
+                res.end();
+                return;
+              }
+            } else if (isPromiseLike<boolean>(authorizeResult)) {
+              let result = false;
+              try {
+                result = await authorizeResult;
+              } catch (err) {
+                res.end();
+                return;
+              }
+              if (!result) {
+                res.end();
+                return;
+              }
             }
           }
           let reqPath = url.parse(req.url).pathname;
